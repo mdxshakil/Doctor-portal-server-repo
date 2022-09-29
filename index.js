@@ -6,7 +6,50 @@ require('dotenv').config();
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const { request } = require('express');
+//todo: nodemailer and smtp
+// const nodemailer = require('nodemailer');
+// const sibTransport = require('nodemailer-sendinblue-transport');
 
+// todo:======> nodemailer start
+// const emailSenderOptions = {
+//     auth: {
+//         api_key: process.env.EMAIL_SENDER_KEY
+//     }
+// }
+
+// const emailClient = nodemailer.createTransport(sibTransport(emailSenderOptions))
+
+// function sendAppoinmentEmail(booking) {
+//     const { treatment, patient, patientName, slot, date } = booking;
+
+//     const email = {
+//         from: process.env.EMAIL_SENDER,
+//         to: patient,
+//         subject: `Your appoinment for ${treatment} is on ${date} at ${slot} is confirmed`,
+//         text: `Your appoinment for ${treatment} is on ${date} at ${slot} is confirmed`,
+//         html: `
+//             <div>
+//                 <h1>Hello ${patientName}</h1>
+//                 <h3>Your appoinment for ${treatment} is confirmed</h3>
+//                 <p>Looking forward to see you on ${date} at ${slot}</p>
+
+//                 <p>Our address</p>
+//                 <p>Dhaka</p>
+//                 <p>Bangladesh</p>
+//             </div>
+//             `
+//     };
+
+//     emailClient.sendMail(email, function (err, info) {
+//         if (err) {
+//             console.log(err);
+//         }
+//         else {
+//             console.log('message sent: ', info);
+//         }
+//     });
+// }
+// todo:====> nodemailer end
 
 // middlwire
 app.use(cors());
@@ -111,6 +154,9 @@ async function run() {
                 return res.send({ success: false, booking: exist })
             }
             const result = await bookingCollection.insertOne(booking);
+            //todo: call email sender
+            // console.log('Sending email......');
+            // sendAppoinmentEmail(booking);
             return res.send({ success: true, result });
         })
 
