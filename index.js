@@ -7,6 +7,7 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const { request } = require('express');
 
+
 // middlwire
 app.use(cors());
 app.use(express.json());
@@ -39,6 +40,19 @@ async function run() {
         const serviceCollection = client.db('doctor_Portal').collection('services');
         const bookingCollection = client.db('doctor_Portal').collection('bookings');
         const usersCollection = client.db('doctor_Portal').collection('users');
+        const doctorsCollection = client.db('doctor_Portal').collection('doctors');
+
+        // verify admin or not using custom middle wire
+        const verifyAdmin = async (req, res, next) => {
+            const requester = req.decoded.email;
+            const requesterAccount = await usersCollection.findOne({ email: requester });
+            if (requesterAccount.role === 'admin') {
+                next()
+            }
+            else {
+                res.status(403).send({ message: 'Forbidden' })
+            }
+        }
         //put the user info on db
         app.put('/user/:email', async (req, res) => {
             const email = req.params.email;
@@ -55,29 +69,25 @@ async function run() {
             res.send({ result, token });
         })
         //make user admin
-        app.put('/user/admin/:email', verifyJWT, async (req, res) => {
+        app.put('/user/admin/:email', verifyJWT, verifyAdmin, async (req, res) => {
             const email = req.params.email; //jake admin banate chai tar email
             const requester = req.decoded.email; //je admin banabe tar email
             const requesterAccount = await usersCollection.findOne({ email: requester });
-            if (requesterAccount.role === 'admin') {
-                const filter = { email: email };
-                const updatedDoc = {
-                    $set: { role: 'admin' },
-                };
-                const result = await usersCollection.updateOne(filter, updatedDoc);
-                res.send(result);
-            }
-            else{
-                res.status(403).send({message: 'Forbidden'})
-            }
+
+            const filter = { email: email };
+            const updatedDoc = {
+                $set: { role: 'admin' },
+            };
+            const result = await usersCollection.updateOne(filter, updatedDoc);
+            res.send(result);
 
         })
         //check user admin or not
-        app.get('/admin/:email', async(req,res) =>{
+        app.get('/admin/:email', async (req, res) => {
             const email = req.params.email;
-            const user = await usersCollection.findOne({email:email});
+            const user = await usersCollection.findOne({ email: email });
             const isAdmin = user.role === "admin";
-            res.send({admin:isAdmin});
+            res.send({ admin: isAdmin });
         })
         //get all users
         app.get('/user', verifyJWT, async (req, res) => {
@@ -87,7 +97,7 @@ async function run() {
         //load all service
         app.get('/service', async (req, res) => {
             const query = {};
-            const cursor = serviceCollection.find(query);
+            const cursor = serviceCollection.find(query).project({ name: 1 });
             const services = await cursor.toArray();
             res.send(services);
         })
@@ -138,6 +148,25 @@ async function run() {
                 return res.status(403).send({ message: 'Forbidden Access' });
             }
 
+        })
+        //add doctor to db
+        app.post('/doctor', verifyJWT, verifyAdmin, async (req, res) => {
+            const doctor = req.body;
+            const result = await doctorsCollection.insertOne(doctor);
+            res.send(result);
+        })
+
+        //get all the doctors
+        app.get('/doctor', verifyJWT, verifyAdmin, async (req, res) => {
+            const doctors = await doctorsCollection.find().toArray();
+            res.send(doctors);
+        })
+        //delete doctor
+        app.delete('/doctor/:email', verifyJWT, verifyAdmin, async (req, res) => {
+            const email = req.params.email;
+            const filter = { email: email };
+            const result = await doctorsCollection.deleteOne(filter);
+            res.send(result);
         })
 
     }
