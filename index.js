@@ -6,11 +6,13 @@ require('dotenv').config();
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const { request } = require('express');
+const ObjectId = require('mongodb').ObjectId;
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 //todo: nodemailer and smtp
 // const nodemailer = require('nodemailer');
 // const sibTransport = require('nodemailer-sendinblue-transport');
 
-// todo:======> nodemailer start
+// todo:======> nodemailer sendinblue start
 // const emailSenderOptions = {
 //     auth: {
 //         api_key: process.env.EMAIL_SENDER_KEY
@@ -84,6 +86,7 @@ async function run() {
         const bookingCollection = client.db('doctor_Portal').collection('bookings');
         const usersCollection = client.db('doctor_Portal').collection('users');
         const doctorsCollection = client.db('doctor_Portal').collection('doctors');
+        const paymentsCollection = client.db('doctor_Portal').collection('payments');
 
         // verify admin or not using custom middle wire
         const verifyAdmin = async (req, res, next) => {
@@ -193,6 +196,41 @@ async function run() {
             else {
                 return res.status(403).send({ message: 'Forbidden Access' });
             }
+
+        })
+        //get individual bookings for payment page
+        app.get('/booking/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const booking = await bookingCollection.findOne(query);
+            res.send(booking);
+        })
+        //payment intent create api
+        app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+            const service = req.body;
+            const price = service.price;
+            const amount = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'USD',
+                payment_method_types: ['card']
+            });
+            res.send({ clientSecret: paymentIntent.client_secret })
+        })
+        //update payment info to db - paid or not
+        app.patch('/booking/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const payment = req.body;
+            const filter = { _id: ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId,
+                }
+            }
+            const result = await paymentsCollection.insertOne(payment);
+            const updatedBooking = await bookingCollection.updateOne(filter, updatedDoc);
+            res.send(updatedDoc);
 
         })
         //add doctor to db
